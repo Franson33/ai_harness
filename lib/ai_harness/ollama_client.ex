@@ -11,7 +11,11 @@ defmodule AiHarness.OllamaClient do
       stream: false
     }
 
-    Req.post(url, json: body)
+    Req.post(
+      url,
+      json: body,
+      receive_timeout: Config.ollama_receive_timeout()
+    )
     |> handle_response()
   end
 
