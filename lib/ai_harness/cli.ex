@@ -25,12 +25,17 @@ defmodule AiHarness.CLI do
     |> IO.gets()
   end
 
-  defp handle_read_result(nil, _session) do
+  defp handle_read_result(:eof, _session) do
     IO.puts("Goodbye!")
     :ok
   end
 
-  defp handle_read_result(input, session) do
+  defp handle_read_result({:error, reason}, session) do
+    IO.puts("Input error: #{inspect(reason)}")
+    loop(session)
+  end
+
+  defp handle_read_result(input, session) when is_binary(input) do
     input
     |> String.trim()
     |> handle_input(session)
