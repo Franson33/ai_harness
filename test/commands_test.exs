@@ -16,7 +16,7 @@ defmodule AiHarness.CommandsTest do
       |> Session.add_user_message("hello")
 
     assert Commands.handle("/clear", session) ==
-             {:clear, Session.new(), "History cleared."}
+             {:continue, Session.new(), "History cleared."}
   end
 
   test "/history returns formatted history" do

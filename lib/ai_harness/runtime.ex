@@ -3,7 +3,8 @@ defmodule AiHarness.Runtime do
   alias AiHarness.Commands
   alias AiHarness.OllamaClient
 
-  defstruct session: Session.new()
+  defstruct session: Session.new(),
+            chat_client: OllamaClient
 
   def new() do
     %__MODULE__{}
@@ -33,13 +34,13 @@ defmodule AiHarness.Runtime do
     |> handle_command_result(runtime)
   end
 
-  defp handle_chat(%__MODULE__{session: session} = runtime, message) do
+  defp handle_chat(%__MODULE__{session: session, chat_client: chat_client} = runtime, message) do
     pending_session = Session.add_user_message(session, message)
 
     result =
       pending_session
       |> Session.messages()
-      |> OllamaClient.chat()
+      |> chat_client.chat()
 
     handle_chat_result(result, runtime, pending_session)
   end
