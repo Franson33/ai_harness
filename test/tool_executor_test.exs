@@ -55,16 +55,16 @@ defmodule AiHarness.ToolExecutorTest do
              {:error, "Path is outside the workspace root"}
   end
 
-  test "run/3 reports the actual type when list_dir receives a file path", %{
+  test "run/3 rejects list_dir when given a file path", %{
     workspace_root: workspace_root
   } do
     assert ToolExecutor.run("list_dir", %{"path" => "README.md"}, workspace_root: workspace_root) ==
-             {:error, "Path is not a file"}
+             {:error, "Path is not a directory"}
   end
 
   test "run/3 rejects read_file on directories", %{workspace_root: workspace_root} do
     assert ToolExecutor.run("read_file", %{"path" => "lib"}, workspace_root: workspace_root) ==
-             {:error, "Path is not a directory"}
+             {:error, "Path is not a file"}
   end
 
   test "run/3 rejects unknown tools", %{workspace_root: workspace_root} do

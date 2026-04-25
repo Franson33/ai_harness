@@ -108,7 +108,11 @@ defmodule AiHarness.Runtime do
          {:ok, parsed} <- parse_decoded_response(decoded) do
       parsed
     else
-      {:error, reason} -> {:final, raw_response}
+      {:error, reason} when is_binary(reason) ->
+        {:error, reason}
+
+      {:error, reason} ->
+        {:error, Exception.message(reason)}
     end
   end
 

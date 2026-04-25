@@ -5,11 +5,19 @@ defmodule AiHarness.RuntimeTest do
   alias AiHarness.Session
 
   defmodule SuccessChatClient do
-    def chat(_messages), do: {:ok, "stub response"}
+    def chat(_messages), do: {:ok, ~s({"type":"final","content":"stub response"})}
   end
 
   defmodule ErrorChatClient do
     def chat(_messages), do: {:error, "timeout"}
+  end
+
+  defmodule InvalidJsonChatClient do
+    def chat(_messages), do: {:ok, "stub response"}
+  end
+
+  defmodule InvalidSchemaChatClient do
+    def chat(_messages), do: {:ok, ~s({"foo":"bar"})}
   end
 
   test "new/0 starts with an empty session" do
@@ -77,5 +85,19 @@ defmodule AiHarness.RuntimeTest do
 
     assert Runtime.handle_input(runtime, "hello") ==
              {:continue, runtime, "Error: timeout"}
+  end
+
+  test "handle_input/2 returns a parser error when the model response is not valid json" do
+    runtime = %Runtime{chat_client: InvalidJsonChatClient}
+
+    assert Runtime.handle_input(runtime, "hello") ==
+             {:continue, runtime, "Error: unexpected byte at position 0: 0x73 (\"s\")"}
+  end
+
+  test "handle_input/2 returns a parser error when the model response json has invalid schema" do
+    runtime = %Runtime{chat_client: InvalidSchemaChatClient}
+
+    assert Runtime.handle_input(runtime, "hello") ==
+             {:continue, runtime, "Error: Invalid model response format"}
   end
 end
