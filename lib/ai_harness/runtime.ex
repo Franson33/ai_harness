@@ -1,10 +1,13 @@
 defmodule AiHarness.Runtime do
+  alias AiHarness.ToolExecutor
   alias AiHarness.Session
   alias AiHarness.Commands
   alias AiHarness.OllamaClient
+  alias AiHarness.ToolExecutor
 
   defstruct session: Session.new(),
-            chat_client: OllamaClient
+            chat_client: OllamaClient,
+            workspace_root: File.cwd!()
 
   def new() do
     %__MODULE__{}
@@ -34,15 +37,114 @@ defmodule AiHarness.Runtime do
     |> handle_command_result(runtime)
   end
 
-  defp handle_chat(%__MODULE__{session: session, chat_client: chat_client} = runtime, message) do
+  defp handle_chat(%__MODULE__{session: session} = runtime, message) do
     pending_session = Session.add_user_message(session, message)
 
     result =
       pending_session
       |> Session.messages()
-      |> chat_client.chat()
+      |> chat(runtime)
 
-    handle_chat_result(result, runtime, pending_session)
+    handle_model_response(result, runtime, pending_session)
+  end
+
+  defp chat(messages, %__MODULE__{chat_client: chat_client}) do
+    chat_client.chat(messages)
+  end
+
+  defp handle_model_response({:error, reason}, runtime, _pending_session) do
+    {:continue, runtime, "Error: #{reason}"}
+  end
+
+  defp handle_model_response({:ok, raw_response}, runtime, pending_session) do
+    raw_response
+    |> parse_model_response()
+    |> handle_parser_result(runtime, pending_session)
+  end
+
+  defp handle_tool_request(runtime, pending_session, tool_name, args) do
+    tool_result = ToolExecutor.run(tool_name, args, workspace_root: runtime.workspace_root)
+    tool_message = build_tool_result_message(tool_name, tool_result)
+
+    tool_session =
+      pending_session
+      |> Session.add_assistant_message(tool_message)
+
+    tool_session
+    |> Session.messages()
+    |> chat(runtime)
+    |> handle_tool_followup(runtime, tool_session)
+  end
+
+  defp handle_tool_followup({:error, reason}, runtime, _tool_session) do
+    {:continue, runtime, "Error: #{reason}"}
+  end
+
+  defp handle_tool_followup({:ok, raw_response}, runtime, tool_session) do
+    raw_response
+    |> parse_model_response()
+    |> handle_parser_result(runtime, tool_session)
+  end
+
+  defp handle_parser_result({:final, content}, runtime, tool_session) do
+    tool_session
+    |> Session.add_assistant_message(content)
+    |> then(&{:continue, %{runtime | session: &1}, content})
+  end
+
+  defp handle_parser_result({:tool, tool_name, args}, runtime, tool_session) do
+    handle_tool_request(runtime, tool_session, tool_name, args)
+  end
+
+  defp handle_parser_result({:tool, _tool_name, _args}, runtime, _tool_session) do
+    {:continue, runtime, "Error: Only one tool call is allowed per turn"}
+  end
+
+  defp handle_parser_result({:error, reason}, runtime, _tool_session) do
+    {:continue, runtime, "Error: #{reason}"}
+  end
+
+  defp parse_model_response(raw_response) do
+    with {:ok, decoded} <- Jason.decode(raw_response),
+         {:ok, parsed} <- parse_decoded_response(decoded) do
+      parsed
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp parse_decoded_response(%{"type" => "final", "content" => content})
+       when is_binary(content) do
+    {:ok, {:final, content}}
+  end
+
+  defp parse_decoded_response(%{"type" => "tool", "tool" => tool, "args" => args})
+       when is_binary(tool) do
+    {:ok, {:tool, tool, args}}
+  end
+
+  defp parse_decoded_response(_decoded) do
+    {:error, "Invalid model response format"}
+  end
+
+  defp build_tool_result_message(tool_name, {:ok, result}) do
+    """
+    Tool result:
+    tool=#{tool_name}
+    status=ok
+    result=#{inspect(result)}
+    """
+    |> String.trim()
+  end
+
+  defp build_tool_result_message(tool_name, {:error, reason}) do
+    """
+    Tool result:
+    tool=#{tool_name}
+    status=error
+    reason=#{inspect(reason)}
+    """
+    |> String.trim()
   end
 
   defp handle_command_result({:exit, new_session}, runtime) do
@@ -51,15 +153,5 @@ defmodule AiHarness.Runtime do
 
   defp handle_command_result({:continue, new_session, output}, runtime) do
     {:continue, %{runtime | session: new_session}, output}
-  end
-
-  defp handle_chat_result({:ok, response}, runtime, pending_session) do
-    pending_session
-    |> Session.add_assistant_message(response)
-    |> then(&{:continue, %{runtime | session: &1}, response})
-  end
-
-  defp handle_chat_result({:error, reason}, runtime, _pending_session) do
-    {:continue, runtime, "Error: #{reason}"}
   end
 end
