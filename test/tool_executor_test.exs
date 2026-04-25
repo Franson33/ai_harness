@@ -36,30 +36,33 @@ defmodule AiHarness.ToolExecutorTest do
              {:ok, %{path: "README.md", content: "hello from test\n", truncated?: false}}
   end
 
-  test "read_file/2 truncates large files", %{workspace_root: workspace_root} do
+  test "run/3 truncates large files for read_file", %{workspace_root: workspace_root} do
     File.write!(Path.join(workspace_root, "large.txt"), "abcdef")
 
-    assert ToolExecutor.read_file("large.txt", workspace_root: workspace_root, max_file_bytes: 3) ==
+    assert ToolExecutor.run("read_file", %{"path" => "large.txt"},
+             workspace_root: workspace_root,
+             max_file_bytes: 3
+           ) ==
              {:ok, %{path: "large.txt", content: "abc", truncated?: true}}
   end
 
-  test "resolve_path/2 rejects paths outside the workspace root", %{workspace_root: workspace_root} do
-    assert ToolExecutor.resolve_path("../outside.txt", workspace_root: workspace_root) ==
+  test "run/3 rejects read_file paths outside the workspace root", %{workspace_root: workspace_root} do
+    assert ToolExecutor.run("read_file", %{"path" => "../outside.txt"}, workspace_root: workspace_root) ==
              {:error, "Path is outside the workspace root"}
   end
 
-  test "list_dir/2 rejects non-directory paths", %{workspace_root: workspace_root} do
-    assert ToolExecutor.list_dir("README.md", workspace_root: workspace_root) ==
-             {:error, "Path is not a directory"}
+  test "run/3 reports the actual type when list_dir receives a file path", %{workspace_root: workspace_root} do
+    assert ToolExecutor.run("list_dir", %{"path" => "README.md"}, workspace_root: workspace_root) ==
+             {:error, "Path is not a file"}
   end
 
-  test "read_file/2 rejects directories", %{workspace_root: workspace_root} do
-    assert ToolExecutor.read_file("lib", workspace_root: workspace_root) ==
-             {:error, "Path is not a regular file"}
+  test "run/3 rejects read_file on directories", %{workspace_root: workspace_root} do
+    assert ToolExecutor.run("read_file", %{"path" => "lib"}, workspace_root: workspace_root) ==
+             {:error, "Path is not a directory"}
   end
 
   test "run/3 rejects unknown tools", %{workspace_root: workspace_root} do
     assert ToolExecutor.run("rm_rf", %{"path" => "."}, workspace_root: workspace_root) ==
-             {:error, "Unknown or invalid tool call: rm_rf"}
+             {:error, "Unknown or invalid tool call: \"rm_rf\""}
   end
 end

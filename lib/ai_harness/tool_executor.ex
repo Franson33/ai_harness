@@ -21,7 +21,7 @@ defmodule AiHarness.ToolExecutor do
         entries
         |> Enum.sort()
         |> Enum.map(fn entry_name ->
-          entry_path = Path.join(path, entry_name)
+          entry_path = Path.join(resolved_path, entry_name)
 
           type =
             File.stat(entry_path)
@@ -75,7 +75,7 @@ defmodule AiHarness.ToolExecutor do
   end
 
   defp inside_workspace?(path, workspace_root) do
-    path == workspace_root or String.starts_with?(path, workspace_root)
+    path == workspace_root or String.starts_with?(path, workspace_root <> "/")
   end
 
   defp ensure_directory(path) do
