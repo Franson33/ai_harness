@@ -1,94 +1,55 @@
 defmodule AiHarness.CLI do
-  alias AiHarness.Commands
   alias AiHarness.Config
-  alias AiHarness.OllamaClient
-  alias AiHarness.Session
+  alias AiHarness.Runtime
 
   def start() do
     Config.welcome_message()
     |> IO.puts()
 
-    Session.new()
+    Runtime.new()
     |> loop()
 
     :ok
   end
 
-  defp loop(session) do
-    session
+  defp loop(runtime) do
+    runtime
     |> read_input()
-    |> handle_read_result(session)
+    |> handle_read_result(runtime)
   end
 
-  defp read_input(_session) do
+  defp read_input(_runtime) do
     Config.prompt()
     |> IO.gets()
   end
 
-  defp handle_read_result(:eof, _session) do
+  defp handle_read_result(:eof, _runtime) do
     IO.puts("Goodbye!")
     :ok
   end
 
-  defp handle_read_result({:error, reason}, session) do
+  defp handle_read_result({:error, reason}, runtime) do
     IO.puts("Input error: #{inspect(reason)}")
-    loop(session)
+    loop(runtime)
   end
 
-  defp handle_read_result(input, session) when is_binary(input) do
-    input
-    |> String.trim()
-    |> handle_input(session)
+  defp handle_read_result(input, runtime) when is_binary(input) do
+    runtime
+    |> Runtime.handle_input(input)
     |> handle_action()
   end
 
-  defp handle_input("", session) do
-    {:continue, session}
+  defp handle_action({:continue, runtime}) do
+    loop(runtime)
   end
 
-  defp handle_input("/" <> _ = command, session) do
-    Commands.handle(command, session)
-  end
-
-  defp handle_input(message, session) do
-    new_session = Session.add_user_message(session, message)
-
-    response =
-      new_session
-      |> Session.messages()
-      |> OllamaClient.chat()
-
-    build_chat_action(response, session, new_session)
-  end
-
-  defp build_chat_action({:ok, response}, _session, new_session) do
-    new_session
-    |> Session.add_assistant_message(response)
-    |> then(&{:continue, &1, response})
-  end
-
-  defp build_chat_action({:error, reason}, session, _new_session) do
-    {:continue, session, "Error: #{reason}"}
+  defp handle_action({:continue, runtime, output}) do
+    IO.puts(output)
+    loop(runtime)
   end
 
   defp handle_action({:exit, _session}) do
     IO.puts("Goodbye!")
     :ok
-  end
-
-  defp handle_action({:continue, session}) do
-    loop(session)
-  end
-
-  defp handle_action({:continue, session, output}) do
-    IO.puts(output)
-
-    loop(session)
-  end
-
-  defp handle_action({:clear, session, output}) do
-    IO.puts(output)
-
-    loop(session)
   end
 end

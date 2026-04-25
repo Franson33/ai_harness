@@ -14,7 +14,7 @@ defmodule AiHarness.Commands do
   end
 
   def handle("/clear", session) do
-    {:clear, Session.clear(session), "History cleared."}
+    {:continue, Session.clear(session), "History cleared."}
   end
 
   def handle("/history", session) do
