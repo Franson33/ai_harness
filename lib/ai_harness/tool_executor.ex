@@ -94,8 +94,8 @@ defmodule AiHarness.ToolExecutor do
     :ok
   end
 
-  defp handle_stat_result({:ok, %File.Stat{type: actual}}, _),
-    do: {:error, "Path is not a #{format_file_type(actual)}"}
+  defp handle_stat_result({:ok, %File.Stat{}}, expected),
+    do: {:error, "Path is not a #{format_file_type(expected)}"}
 
   defp handle_stat_result({:error, :enoent}, _) do
     {:error, "Path does not exist"}
@@ -107,7 +107,6 @@ defmodule AiHarness.ToolExecutor do
 
   defp format_file_type(:directory), do: "directory"
   defp format_file_type(:regular), do: "file"
-  defp format_file_type(type), do: Atom.to_string(type)
 
   defp format_file_type_stat({:ok, %File.Stat{type: :directory}}), do: "directory"
   defp format_file_type_stat({:ok, %File.Stat{type: :regular}}), do: "file"

@@ -46,12 +46,18 @@ defmodule AiHarness.ToolExecutorTest do
              {:ok, %{path: "large.txt", content: "abc", truncated?: true}}
   end
 
-  test "run/3 rejects read_file paths outside the workspace root", %{workspace_root: workspace_root} do
-    assert ToolExecutor.run("read_file", %{"path" => "../outside.txt"}, workspace_root: workspace_root) ==
+  test "run/3 rejects read_file paths outside the workspace root", %{
+    workspace_root: workspace_root
+  } do
+    assert ToolExecutor.run("read_file", %{"path" => "../outside.txt"},
+             workspace_root: workspace_root
+           ) ==
              {:error, "Path is outside the workspace root"}
   end
 
-  test "run/3 reports the actual type when list_dir receives a file path", %{workspace_root: workspace_root} do
+  test "run/3 reports the actual type when list_dir receives a file path", %{
+    workspace_root: workspace_root
+  } do
     assert ToolExecutor.run("list_dir", %{"path" => "README.md"}, workspace_root: workspace_root) ==
              {:error, "Path is not a file"}
   end
