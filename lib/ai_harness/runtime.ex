@@ -42,6 +42,7 @@ defmodule AiHarness.Runtime do
     result =
       pending_session
       |> Session.messages()
+      |> model_messages()
       |> chat(runtime)
 
     handle_model_response(result, runtime, pending_session)
@@ -156,5 +157,49 @@ defmodule AiHarness.Runtime do
 
   defp handle_command_result({:continue, new_session, output}, runtime) do
     {:continue, %{runtime | session: new_session}, output}
+  end
+
+  defp model_messages(messages) do
+    [
+      %{
+        "role" => "system",
+        "content" =>
+          """
+          You are operating inside a local AI harness.
+
+          You must respond with valid JSON only.
+
+          Allowed response formats:
+
+          {"type":"final","content":"your answer here"}
+
+          {"type":"tool","tool":"list_dir","args":{"path":"."}}
+
+          {"type":"tool","tool":"read_file","args":{"path":"relative/path.txt"}}
+
+          Available tools:
+
+          - list_dir
+            Use this to inspect the contents of a directory inside the workspace.
+            Arguments:
+            {"path":"relative/path"}
+
+          - read_file
+            Use this to read a file inside the workspace.
+            Arguments:
+            {"path":"relative/path.txt"}
+
+          Rules:
+          - Use only the listed tools.
+          - Use only relative workspace paths.
+          - Do not invent tool names.
+          - Call at most one tool in a turn.
+          - If no tool is needed, return a final answer.
+          - After receiving a tool result, return a final answer.
+          """
+          |> String.trim()
+      }
+      | messages
+    ]
   end
 end
