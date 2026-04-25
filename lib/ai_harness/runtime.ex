@@ -3,7 +3,6 @@ defmodule AiHarness.Runtime do
   alias AiHarness.Session
   alias AiHarness.Commands
   alias AiHarness.OllamaClient
-  alias AiHarness.ToolExecutor
 
   defstruct session: Session.new(),
             chat_client: OllamaClient,
@@ -59,7 +58,7 @@ defmodule AiHarness.Runtime do
   defp handle_model_response({:ok, raw_response}, runtime, pending_session) do
     raw_response
     |> parse_model_response()
-    |> handle_parser_result(runtime, pending_session)
+    |> handle_parser_result(runtime, pending_session, :initial)
   end
 
   defp handle_tool_request(runtime, pending_session, tool_name, args) do
@@ -83,24 +82,24 @@ defmodule AiHarness.Runtime do
   defp handle_tool_followup({:ok, raw_response}, runtime, tool_session) do
     raw_response
     |> parse_model_response()
-    |> handle_parser_result(runtime, tool_session)
+    |> handle_parser_result(runtime, tool_session, :after)
   end
 
-  defp handle_parser_result({:final, content}, runtime, tool_session) do
+  defp handle_parser_result({:final, content}, runtime, tool_session, _phase) do
     tool_session
     |> Session.add_assistant_message(content)
     |> then(&{:continue, %{runtime | session: &1}, content})
   end
 
-  defp handle_parser_result({:tool, tool_name, args}, runtime, tool_session) do
+  defp handle_parser_result({:tool, tool_name, args}, runtime, tool_session, :initial) do
     handle_tool_request(runtime, tool_session, tool_name, args)
   end
 
-  defp handle_parser_result({:tool, _tool_name, _args}, runtime, _tool_session) do
+  defp handle_parser_result({:tool, _tool_name, _args}, runtime, _tool_session, :after) do
     {:continue, runtime, "Error: Only one tool call is allowed per turn"}
   end
 
-  defp handle_parser_result({:error, reason}, runtime, _tool_session) do
+  defp handle_parser_result({:error, reason}, runtime, _tool_session, _phase) do
     {:continue, runtime, "Error: #{reason}"}
   end
 
@@ -109,7 +108,7 @@ defmodule AiHarness.Runtime do
          {:ok, parsed} <- parse_decoded_response(decoded) do
       parsed
     else
-      {:error, reason} -> {:error, reason}
+      {:error, reason} -> {:final, raw_response}
     end
   end
 
