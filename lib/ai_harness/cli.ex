@@ -80,4 +80,10 @@ defmodule AiHarness.CLI do
 
     loop(session)
   end
+
+  defp handle_action({:clear, session, output}) do
+    IO.puts(output)
+
+    loop(session)
+  end
 end
