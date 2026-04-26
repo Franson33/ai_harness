@@ -3,7 +3,7 @@ defmodule AiHarness.Config do
 
   @welcome_message """
   +------------------+
-  | Anton's Code :)  |
+  |   AntonCode :)   |
   +------------------+
   """
 

@@ -44,7 +44,7 @@ defmodule AiHarness.CLI do
   end
 
   defp handle_action({:continue, runtime, output}) do
-    IO.puts(output)
+    IO.puts("\nassistant: #{output}\n")
     loop(runtime)
   end
 
