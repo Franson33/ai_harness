@@ -1,6 +1,7 @@
 defmodule AiHarness.OllamaClient do
   alias AiHarness.Config
   alias Req.Response
+  alias AiHarness.DebugLogger
 
   def chat(messages) when is_list(messages) do
     url = Config.ollama_base_url() <> "/api/chat"
@@ -10,6 +11,8 @@ defmodule AiHarness.OllamaClient do
       messages: messages,
       stream: false
     }
+
+    DebugLogger.log_request(messages)
 
     Req.post(
       url,
@@ -22,6 +25,8 @@ defmodule AiHarness.OllamaClient do
   defp handle_response(
          {:ok, %Response{status: 200, body: %{"message" => %{"content" => content}}}}
        ) do
+    DebugLogger.log_response(content)
+
     {:ok, content}
   end
 
