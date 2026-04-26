@@ -72,6 +72,7 @@ defmodule AiHarness.Runtime do
 
     tool_session
     |> Session.messages()
+    |> model_messages()
     |> chat(runtime)
     |> handle_tool_followup(runtime, tool_session)
   end
@@ -168,6 +169,11 @@ defmodule AiHarness.Runtime do
           You are operating inside a local AI harness.
 
           You must respond with valid JSON only.
+          Your entire response must be a single valid JSON object.
+          Do not write any text before or after the JSON.
+          Do not use markdown.
+          Do not use code fences.
+          If you fail to return JSON, your response will be rejected.
 
           Allowed response formats:
 
