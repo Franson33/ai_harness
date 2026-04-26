@@ -101,35 +101,14 @@ defmodule AiHarness.Runtime do
     {:continue, runtime, "Error: Only one tool call is allowed per turn"}
   end
 
-  defp handle_parser_result({:error, reason}, runtime, _tool_session, _phase) do
-    {:continue, runtime, "Error: #{reason}"}
-  end
-
   defp parse_model_response(raw_response) do
-    with {:ok, decoded} <- Jason.decode(raw_response),
-         {:ok, parsed} <- parse_decoded_response(decoded) do
-      parsed
-    else
-      {:error, reason} when is_binary(reason) ->
-        {:error, reason}
+    case Jason.decode(raw_response) do
+      {:ok, %{"type" => "tool", "tool" => tool, "args" => args}} when is_binary(tool) ->
+        {:tool, tool, args}
 
-      {:error, reason} ->
-        {:error, Exception.message(reason)}
+      _ ->
+        {:final, raw_response}
     end
-  end
-
-  defp parse_decoded_response(%{"type" => "final", "content" => content})
-       when is_binary(content) do
-    {:ok, {:final, content}}
-  end
-
-  defp parse_decoded_response(%{"type" => "tool", "tool" => tool, "args" => args})
-       when is_binary(tool) do
-    {:ok, {:tool, tool, args}}
-  end
-
-  defp parse_decoded_response(_decoded) do
-    {:error, "Invalid model response format"}
   end
 
   defp build_tool_result_message(tool_name, {:ok, result}) do
@@ -168,40 +147,28 @@ defmodule AiHarness.Runtime do
           """
           You are operating inside a local AI harness.
 
-          You must respond with valid JSON only.
-          Your entire response must be a single valid JSON object.
-          Do not write any text before or after the JSON.
-          Do not use markdown.
-          Do not use code fences.
-          If you fail to return JSON, your response will be rejected.
+          Respond in plain text or markdown — write naturally, use formatting when it helps.
 
-          Allowed response formats:
-
-          {"type":"final","content":"your answer here"}
+          If you need to inspect the workspace before answering, call exactly one tool by responding with ONLY a JSON object and nothing else:
 
           {"type":"tool","tool":"list_dir","args":{"path":"."}}
-
           {"type":"tool","tool":"read_file","args":{"path":"relative/path.txt"}}
 
           Available tools:
 
-          - list_dir
-            Use this to inspect the contents of a directory inside the workspace.
-            Arguments:
-            {"path":"relative/path"}
+          - list_dir — inspect the contents of a directory
+          args: {"path":"relative/path"}
 
-          - read_file
-            Use this to read a file inside the workspace.
-            Arguments:
-            {"path":"relative/path.txt"}
+          - read_file — read a file's contents
+          args: {"path":"relative/path.txt"}
 
           Rules:
-          - Use only the listed tools.
-          - Use only relative workspace paths.
+          - Only call a tool when you genuinely need workspace information to answer.
+          - Use only relative paths within the workspace.
           - Do not invent tool names.
-          - Call at most one tool in a turn.
-          - If no tool is needed, return a final answer.
-          - After receiving a tool result, return a final answer.
+          - Call at most one tool per turn.
+          - When you call a tool, your entire response must be the JSON object — no text before or after.
+          - After receiving a tool result, give your final answer in plain text or markdown.
           """
           |> String.trim()
       }

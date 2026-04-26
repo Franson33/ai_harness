@@ -5,18 +5,14 @@ defmodule AiHarness.RuntimeTest do
   alias AiHarness.Session
 
   defmodule SuccessChatClient do
-    def chat(_messages), do: {:ok, ~s({"type":"final","content":"stub response"})}
+    def chat(_messages), do: {:ok, "stub response"}
   end
 
   defmodule ErrorChatClient do
     def chat(_messages), do: {:error, "timeout"}
   end
 
-  defmodule InvalidJsonChatClient do
-    def chat(_messages), do: {:ok, "stub response"}
-  end
-
-  defmodule InvalidSchemaChatClient do
+  defmodule NonToolJsonChatClient do
     def chat(_messages), do: {:ok, ~s({"foo":"bar"})}
   end
 
@@ -28,9 +24,9 @@ defmodule AiHarness.RuntimeTest do
 
         %{"role" => "assistant", "content" => content} ->
           if String.contains?(content, "Tool result:") do
-            {:ok, ~s({"type":"final","content":"I found the file contents"})}
+            {:ok, "I found the file contents"}
           else
-            {:ok, ~s({"type":"final","content":"unexpected"})}
+            {:ok, "unexpected"}
           end
       end
     end
@@ -109,18 +105,20 @@ defmodule AiHarness.RuntimeTest do
              {:continue, runtime, "Error: timeout"}
   end
 
-  test "handle_input/2 returns a parser error when the model response is not valid json" do
-    runtime = %Runtime{chat_client: InvalidJsonChatClient}
+  test "handle_input/2 treats non-tool json as a plain text final answer" do
+    runtime = %Runtime{chat_client: NonToolJsonChatClient}
 
     assert Runtime.handle_input(runtime, "hello") ==
-             {:continue, runtime, "Error: unexpected byte at position 0: 0x73 (\"s\")"}
-  end
-
-  test "handle_input/2 returns a parser error when the model response json has invalid schema" do
-    runtime = %Runtime{chat_client: InvalidSchemaChatClient}
-
-    assert Runtime.handle_input(runtime, "hello") ==
-             {:continue, runtime, "Error: Invalid model response format"}
+             {:continue,
+              %Runtime{
+                session: %Session{
+                  messages: [
+                    %{"role" => "user", "content" => "hello"},
+                    %{"role" => "assistant", "content" => ~s({"foo":"bar"})}
+                  ]
+                },
+                chat_client: NonToolJsonChatClient
+              }, ~s({"foo":"bar"})}
   end
 
   test "handle_input/2 executes one tool call and then returns the final answer" do
